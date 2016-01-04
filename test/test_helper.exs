@@ -7,6 +7,12 @@ defmodule Helper do
     Stripe.Plans.create [id: "test-std", name: "Test Plan Standard", amount: 100, interval: "month"]
     Stripe.Plans.create [id: "test-dlx", name: "Test Plan Deluxe", amount: 1000, interval: "month"]
   end
+  def create_test_plan id do
+    Stripe.Plans.create [id: id, name: "Test Plan #{id}", amount: 100, interval: "month"]
+  end
+  def delete_test_plan id do
+    Stripe.Plans.delete id
+  end
 
   def delete_test_plans do
     Stripe.Plans.delete "test-std"
@@ -39,6 +45,11 @@ defmodule Helper do
     ]
     {:ok, res} = Stripe.Accounts.create new_account
     res
+  end
+
+  def conntected_account do
+    Application.get_env(:stripity_stripe, :connected_account) ||
+      System.get_env "STRIPE_CONNECTED_ACCOUNT"
   end
 end
 

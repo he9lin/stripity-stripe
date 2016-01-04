@@ -2,7 +2,7 @@ defmodule Stripe.AccountCustomerTest do
   use ExUnit.Case
 
   setup_all do
-    stripe_account = "acct_17NZ5REVhgDzSN3o"
+    stripe_account = Helper.conntected_account
 
     Stripe.AccountCustomers.delete_all(stripe_account)
 

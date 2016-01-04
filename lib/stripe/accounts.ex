@@ -54,8 +54,20 @@ defmodule Stripe.Accounts do
 
   """
   def create(params) do
-    Stripe.make_request(:post, @endpoint, params)
-      |> Stripe.Util.handle_stripe_response
+    create params, Stripe.config_or_env_key
+  end
+
+  @doc """
+  Save as create(params).
+  Accepts a stripe api key (for connect workflow)
+  # Example
+```
+{:ok, resp} = Stripe.Account.create(params,key)
+```
+  """
+  def create(params, key) do
+    Stripe.make_request_with_key(:post, @endpoint, key, params)
+    |> Stripe.Util.handle_stripe_response
   end
 
   @doc """
@@ -63,14 +75,27 @@ defmodule Stripe.Accounts do
   ## Example
 
   ```
-    Stripe.Accounts.get "account_id"
+    {:ok, account} = Stripe.Accounts.get "account_id" 
   ```
 
   """
   def get(id) do
-    Stripe.make_request(:get, "#{@endpoint}/#{id}")
-      |> Stripe.Util.handle_stripe_response
+    get id, Stripe.config_or_env_key
   end
+
+  @doc """
+  Retrieves a given Account with the specified ID. Returns 404 if not found.
+  Accepts a stripe api key (for connect workflow)
+  ## Example
+
+  ```
+  {:ok, account} = Stripe.Accounts.get "account_id", key
+  ```
+"""
+   def get(id, key) do
+    Stripe.make_request_with_key(:get, "#{@endpoint}/#{id}", key)
+    |> Stripe.Util.handle_stripe_response
+   end
 
   @max_fetch_size 100
   @doc """
@@ -83,18 +108,36 @@ defmodule Stripe.Accounts do
   ```
 
   """
-  def all( accum \\ [], startingAfter \\ "") do
-    case Stripe.Util.list_raw("#{@endpoint}",@max_fetch_size, startingAfter) do
+  def all( accum \\ [], starting_after \\ "") do
+    all Stripe.config_or_env_key, accum, starting_after 
+  end
+
+  @doc """
+  List all accounts.
+  Accepts a stripe api key (for connect workflow)
+
+  ##Example
+
+  ```
+  {:ok, accounts} = Stripe.Accounts.all key, accum, starting_after
+  ```
+  where accum is []
+  starting_after is the paging marker
+
+  """
+  def all( key, accum, starting_after) do
+    case Stripe.Util.list_raw("#{@endpoint}", key, @max_fetch_size, starting_after)  do
+
       {:ok, resp}  ->
         case resp[:has_more] do
           true ->
             last_sub = List.last( resp[:data] )
-            all( resp[:data] ++ accum, last_sub["id"] )
+            all( key, resp[:data] ++ accum, last_sub["id"] )
           false ->
             result = resp[:data] ++ accum
             {:ok, result}
         end
-    {:error, err} -> raise err
+      {:error, err} -> raise err
     end
   end
 
@@ -108,8 +151,22 @@ defmodule Stripe.Accounts do
   ```
   """
   def delete(id) do
-    Stripe.make_request(:delete, "#{@endpoint}/#{id}")
-      |> Stripe.Util.handle_stripe_response
+    delete id, Stripe.config_or_env_key
+  end
+
+  @doc """
+  Deletes a Account with the specified ID
+  Accepts a stripe api key (for connect workflow)
+
+  ## Example
+
+  ```
+  Stripe.Accounts.delete "account_id", key
+  ```
+  """
+  def delete(id, key) do
+    Stripe.make_request_with_key(:delete, "#{@endpoint}/#{id}", key)
+    |> Stripe.Util.handle_stripe_response
   end
 
   @doc """
@@ -122,9 +179,23 @@ defmodule Stripe.Accounts do
   ```
   """
   def delete_all do
+    delete_all Stripe.config_or_env_key
+  end
+
+  @doc """
+  Deletes all Accounts
+  Accepts a stripe api key (for connect workflow)
+
+  ## Example
+
+  ```
+  Stripe.Accounts.delete_all key
+  ```
+  """
+  def delete_all key do
     case all  do
       {:ok, accounts} ->
-        Enum.each accounts, fn c -> delete(c["id"]) end
+        Enum.each accounts, fn c -> delete(c["id"], key) end
       {:error, err} -> raise err
     end
   end
@@ -142,6 +213,19 @@ defmodule Stripe.Accounts do
   end
 
   @doc """
+  Count total number of accounts.
+  Accepts a stripe api key (for connect workflow)
+
+  ## Example
+  ```
+  {:ok, count} = Stripe.Accounts.count key
+  ```
+  """
+  def count key do
+    Stripe.Util.count "#{@endpoint}", key
+  end
+
+  @doc """
   Returns a list of Accounts with a default limit of 10 which you can override with `list/1`
 
   ## Example
@@ -151,7 +235,21 @@ defmodule Stripe.Accounts do
   ```
   """
   def list(limit \\ 10) do
-    Stripe.make_request(:get, "#{@endpoint}?limit=#{limit}")
-      |> Stripe.Util.handle_stripe_response
+    list limit, Stripe.config_or_env_key
+  end
+
+  @doc """
+  Returns a list of Accounts with a default limit of 10 which you can override with `list/1`
+  Accepts a stripe api key (for connect workflow)
+  
+  ## Example
+
+  ```
+  {:ok, accounts} = Stripe.Accounts.list(20, key)
+  ```
+  """
+  def list(limit, key) do
+    Stripe.make_request_with_key(:get, "#{@endpoint}?limit=#{limit}", key)
+    |> Stripe.Util.handle_stripe_response
   end
 end
