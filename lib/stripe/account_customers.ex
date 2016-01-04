@@ -30,8 +30,7 @@ defmodule Stripe.AccountCustomers do
   def all(stripe_account, accum \\ [], startingAfter \\ "") do
     headers = HashDict.new |> Dict.put("Stripe-Account", stripe_account)
 
-    case Stripe.Util.list_raw(
-      "#{@endpoint}", @max_fetch_size, startingAfter, [], headers) do
+    case list_raw("#{@endpoint}", @max_fetch_size, startingAfter, headers) do
       {:ok, resp}  ->
         case resp[:has_more] do
           true ->
@@ -43,5 +42,20 @@ defmodule Stripe.AccountCustomers do
         end
       {:error, err} -> raise err
     end
+  end
+
+  defp list_raw(endpoint, limit \\ 10, starting_after \\ "", headers \\ []) do
+    list_raw endpoint, Stripe.config_or_env_key, limit, starting_after, headers
+  end
+
+  defp list_raw(endpoint, key, limit, starting_after, headers)  do
+    q = "#{endpoint}?limit=#{limit}"
+
+    if  String.length(starting_after) > 0 do
+        q = q <> "&starting_after=#{starting_after}"
+    end
+
+    Stripe.make_request_with_key(:get, q, key, [], headers)
+    |> Stripe.Util.handle_stripe_full_response
   end
 end

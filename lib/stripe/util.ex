@@ -41,18 +41,18 @@ defmodule Stripe.Util do
     end
   end
 
-  def list_raw( endpoint, limit \\ 10, starting_after \\ "", body \\ [], headers \\ []) do
-    list_raw endpoint, Stripe.config_or_env_key, limit, starting_after, body, headers
+  def list_raw( endpoint, limit \\ 10, starting_after \\ "") do
+    list_raw endpoint, Stripe.config_or_env_key, limit, starting_after
   end
 
-  def list_raw( endpoint, key, limit, starting_after, body, headers) do
+  def list_raw( endpoint, key, limit, starting_after)  do
     q = "#{endpoint}?limit=#{limit}"
 
     if  String.length(starting_after) > 0 do
         q = q <> "&starting_after=#{starting_after}"
     end
 
-    Stripe.make_request_with_key(:get, q, key, body, headers)
+    Stripe.make_request_with_key(:get, q, key )
     |> Stripe.Util.handle_stripe_full_response
   end
 
@@ -76,5 +76,5 @@ defmodule Stripe.Util do
         {:ok, res[:total_count]}
       {:error, err} -> raise err
     end
-  end
+end
 end
