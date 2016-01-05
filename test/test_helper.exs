@@ -46,10 +46,5 @@ defmodule Helper do
     {:ok, res} = Stripe.Accounts.create new_account
     res
   end
-
-  def conntected_account do
-    Application.get_env(:stripity_stripe, :connected_account) ||
-      System.get_env "STRIPE_CONNECTED_ACCOUNT"
-  end
 end
 

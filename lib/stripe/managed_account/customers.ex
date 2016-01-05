@@ -1,4 +1,4 @@
-defmodule Stripe.AccountCustomers do
+defmodule Stripe.ManagedAccount.Customers do
   @endpoint "customers"
 
   def create(nil, _), do: {:error, "A connected account id is missing" }
@@ -59,3 +59,4 @@ defmodule Stripe.AccountCustomers do
     |> Stripe.Util.handle_stripe_full_response
   end
 end
+
