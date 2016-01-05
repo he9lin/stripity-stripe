@@ -13,6 +13,12 @@ defmodule Stripe.ManagedAccount.ApiOperations do
       |> Stripe.Util.handle_stripe_response
   end
 
+  def change(_, nil, _, _), do: {:error, "account id is missing"}
+  def change(endpoint, stripe_account, id, params) do
+    make_request(stripe_account, :post, "#{endpoint}/#{id}", params)
+      |> Stripe.Util.handle_stripe_response
+  end
+
   def delete_all(_, nil), do: {:error, "account id is missing"}
   def delete_all(endpoint, stripe_account) do
     case all(endpoint, stripe_account) do

@@ -22,7 +22,7 @@ defmodule Stripe.ManagedAccount.PlanTest do
           {:ok, _} = Plans.delete stripe_account, plan.id
           {:ok, _} = Accounts.delete stripe_account
         end
-        {:ok, [plan: plan]}
+        {:ok, [plan: plan, stripe_account: stripe_account]}
 
       {:error, err} -> flunk err
     end
@@ -30,5 +30,10 @@ defmodule Stripe.ManagedAccount.PlanTest do
 
   test "Create works", %{plan: plan} do
     assert plan.id
+  end
+
+  test "Update works", %{plan: plan, stripe_account: stripe_account} do
+    {:ok, plan} = Plans.change stripe_account, plan.id, name: "Silver plan"
+    assert plan.name == "Silver plan"
   end
 end

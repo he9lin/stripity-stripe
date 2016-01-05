@@ -14,6 +14,10 @@ defmodule Stripe.ManagedAccount.Plans do
     ApiOperations.delete(@endpoint, stripe_account, id)
   end
 
+  def change(stripe_account, id, params) do
+    ApiOperations.change(@endpoint, stripe_account, id, params)
+  end
+
   def delete_all(stripe_account) do
     ApiOperations.delete_all(@endpoint, stripe_account)
   end

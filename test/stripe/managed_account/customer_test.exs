@@ -20,7 +20,7 @@ defmodule Stripe.ManagedAccount.CustomerTest do
           {:ok, _} = Customers.delete stripe_account, customer.id
           {:ok, _} = Accounts.delete stripe_account
         end
-        {:ok, [customer: customer]}
+        {:ok, [customer: customer, stripe_account: stripe_account]}
 
       {:error, err} -> flunk err
     end
@@ -28,5 +28,11 @@ defmodule Stripe.ManagedAccount.CustomerTest do
 
   test "Create works", %{customer: customer} do
     assert customer.id
+  end
+
+  test "Update works", %{customer: customer, stripe_account: stripe_account} do
+    {:ok, customer} = Customers.change stripe_account, customer.id,
+      email: "newtest@test.com"
+    assert customer.email == "newtest@test.com"
   end
 end
