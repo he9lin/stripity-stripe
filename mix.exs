@@ -2,47 +2,186 @@ defmodule Stripe.Mixfile do
   use Mix.Project
 
   def project do
-    [ app: :stripity_stripe,
-      version: "1.0.0",
-      description: "A Stripe Library for Elixir",
-      package: package,
-      elixir: "~> 1.1.1",
-      deps: deps(Mix.env) ]
+    [
+      app: :stripity_stripe,
+      deps: deps(),
+      description: description(),
+      dialyzer: [
+        plt_add_apps: [:mix],
+        plt_file: {:no_warn, "priv/plts/stripity_stripe.plt"}
+      ],
+      elixir: "~> 1.7",
+      package: package(),
+      elixirc_paths: elixirc_paths(Mix.env()),
+      preferred_cli_env: [
+        coveralls: :test,
+        "coveralls.detail": :test,
+        "coveralls.post": :test,
+        "coveralls.html": :test
+      ],
+      test_coverage: [tool: ExCoveralls],
+      version: "2.7.2",
+      source_url: "https://github.com/code-corps/stripity_stripe/",
+      docs: [
+        main: "readme",
+        extras: ["README.md"],
+        groups_for_modules: groups_for_modules(),
+        nest_modules_by_prefix: nest_modules_by_prefix()
+      ]
+    ]
   end
 
   # Configuration for the OTP application
   def application do
     [
-      applications: [:httpoison],
-      mod: { Stripe, [] }
+      applications: apps(Mix.env()),
+      env: env(),
+      mod: {Stripe, []}
     ]
   end
 
-  defp deps(:dev) do
-    deps(:prod)
-  end
+  # Specifies which paths to compile per environment.
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_), do: ["lib"]
 
-  defp deps(:test) do
-    deps(:dev)
-  end
-
-
-  defp deps(:prod) do
+  defp env() do
     [
-      {:httpoison, "~> 0.7.4" },
-      {:hackney, "~> 1.3.2" }, # not included in hex version of httpoison :(
-      {:poison, "~> 1.5"},
-      {:ex_doc, "~> 0.7", only: :dev},
-      {:earmark, ">= 0.0.0"}
+      api_base_url: "https://api.stripe.com/v1/",
+      api_upload_url: "https://files.stripe.com/v1/",
+      pool_options: [
+        timeout: 5_000,
+        max_connections: 10
+      ],
+      use_connection_pool: true
     ]
   end
 
-  def package do
+  defp apps(:test), do: apps()
+  defp apps(_), do: apps()
+  defp apps(), do: [:hackney, :logger, :jason, :uri_query]
+
+  defp deps do
     [
-      maintainers: ["Rob Conery","Nic Rioux"],
+      {:dialyxir, "1.0.0-rc.4", only: [:dev, :test], runtime: false},
+      {:ex_doc, "~> 0.20.2", only: :dev},
+      {:excoveralls, "~> 0.11.1", only: :test},
+      {:hackney, "~> 1.15"},
+      {:inch_ex, "~> 2.0", only: [:dev, :test]},
+      {:mox, "~> 0.4", only: :test},
+      {:jason, "~> 1.1"},
+      {:uri_query, "~> 0.1.2"},
+      {:exexec, "~> 0.1.0", only: :test}
+    ]
+  end
+
+  defp description do
+    """
+    A Stripe client for Elixir.
+    """
+  end
+
+  defp package do
+    [
+      files: ["lib", "LICENSE*", "mix.exs", "README*"],
       licenses: ["New BSD"],
-      links: %{"GitHub" => "https://github.com/robconery/stripity-stripe"}
+      links: %{
+        "GitHub" => "https://github.com/code-corps/stripity_stripe"
+      },
+      maintainers: ["Dan Matthews", "Josh Smith", "Nikola Begedin", "Scott Newcomer"]
     ]
   end
 
+  defp groups_for_modules do
+    [
+      "Core Resources": [
+        Stripe.Balance,
+        Stripe.BalanceTransaction,
+        Stripe.Charge,
+        Stripe.Customer,
+        Stripe.Dispute,
+        Stripe.Event,
+        Stripe.FileUpload,
+        Stripe.PaymentIntent,
+        Stripe.Payout,
+        Stripe.Product,
+        Stripe.Refund,
+        Stripe.SetupIntent,
+        Stripe.TaxID,
+        Stripe.Token
+      ],
+      "Payment Methods": [
+        Stripe.BankAccount,
+        Stripe.Card,
+        Stripe.PaymentMethod,
+        Stripe.Source
+      ],
+      Checkout: [
+        Stripe.Session
+      ],
+      Billing: [
+        Stripe.Coupon,
+        Stripe.CreditNote,
+        Stripe.Discount,
+        Stripe.Invoice,
+        Stripe.Invoiceitem,
+        Stripe.LineItem,
+        Stripe.Product,
+        Stripe.Plan,
+        Stripe.Subscription,
+        Stripe.SubscriptionItem,
+        Stripe.SubscriptionItem.Usage,
+        Stripe.SubscriptionSchedule,
+        Stripe.TaxRate
+      ],
+      Connect: [
+        Stripe.Account,
+        Stripe.ApplicationFee,
+        Stripe.CountrySpec,
+        Stripe.ExternalAccount,
+        Stripe.FeeRefund,
+        Stripe.LoginLink,
+        Stripe.Connect.OAuth,
+        Stripe.Connect.OAuth.AuthorizeResponse,
+        Stripe.Connect.OAuth.TokenResponse,
+        Stripe.Connect.OAuth.DeauthorizeResponse,
+        Stripe.Recipient,
+        Stripe.Topup,
+        Stripe.Transfer,
+        Stripe.TransferReversal
+      ],
+      Fraud: [
+        Stripe.Review
+      ],
+      Issuing: [
+        Stripe.Issuing.Authorization,
+        Stripe.Issuing.Card,
+        Stripe.Issuing.CardDetails,
+        Stripe.Issuing.Cardholder,
+        Stripe.Issuing.Dispute,
+        Stripe.Issuing.Transaction,
+        Stripe.Issuing.Types
+      ],
+      "Relay/Orders": [
+        Stripe.Order,
+        Stripe.OrderItem,
+        Stripe.OrderReturn,
+        Stripe.Relay.Product,
+        Stripe.Sku
+      ],
+      Utilities: [
+        Stripe.Config,
+        Stripe.Converter,
+        Stripe.Types
+      ]
+    ]
+  end
+
+  def nest_modules_by_prefix() do
+    [
+      Stripe.Connect.OAuth,
+      Stripe.Connect.OAuth.AuthorizeResponse,
+      Stripe.Connect.OAuth.TokenResponse,
+      Stripe.Connect.OAuth.DeauthorizeResponse
+    ]
+  end
 end

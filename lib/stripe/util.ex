@@ -1,80 +1,96 @@
 defmodule Stripe.Util do
-  def datetime_from_timestamp(ts) when is_binary ts do
-    ts = case Integer.parse ts do
-      :error -> 0
-      {i, _r} -> i
+  @moduledoc false
+
+  @doc """
+  Performs a root-level conversion of map keys from strings to atoms.
+
+  This function performs the transformation safely using `String.to_existing_atom/1`, but this has a possibility to raise if
+  there is not a corresponding atom.
+
+  It is recommended that you pre-filter maps for known values before
+  calling this function.
+
+  ## Examples
+
+  iex> map = %{
+  ...>   "a"=> %{
+  ...>     "b" => %{
+  ...>       "c" => 1
+  ...>     }
+  ...>   }
+  ...> }
+  iex> Stripe.Util.map_keys_to_atoms(map)
+  %{
+    a: %{
+      "b" => %{
+        "c" => 1
+      }
+    }
+  }
+  """
+  def map_keys_to_atoms(m) do
+    Enum.into(m, %{}, fn
+      {k, v} when is_binary(k) ->
+        a = String.to_atom(k)
+        {a, v}
+
+      entry ->
+        entry
+    end)
+  end
+
+  def atomize_keys(map = %{}) do
+    Enum.into(map, %{}, fn {k, v} -> {atomize_key(k), atomize_keys(v)} end)
+  end
+
+  def atomize_keys([head | rest]), do: [atomize_keys(head) | atomize_keys(rest)]
+  # Default
+  def atomize_keys(not_a_map), do: not_a_map
+
+  def atomize_key(k) when is_binary(k), do: String.to_atom(k)
+  def atomize_key(k), do: k
+
+  @spec object_name_to_module(String.t()) :: module
+  def object_name_to_module("checkout.session"), do: Stripe.Session
+  def object_name_to_module("file"), do: Stripe.FileUpload
+  def object_name_to_module("issuing.authorization"), do: Stripe.Issuing.Authorization
+  def object_name_to_module("issuing.card"), do: Stripe.Issuing.Card
+  def object_name_to_module("issuing.card_details"), do: Stripe.Issuing.CardDetails
+  def object_name_to_module("issuing.cardholder"), do: Stripe.Issuing.Cardholder
+  def object_name_to_module("issuing.dispute"), do: Stripe.Issuing.Dispute
+  def object_name_to_module("issuing.transaction"), do: Stripe.Issuing.Transaction
+  def object_name_to_module("tax_id"), do: Stripe.TaxID
+
+  def object_name_to_module(object_name) do
+    module_name =
+      object_name
+      |> String.split("_")
+      |> Enum.map_join("", &String.capitalize/1)
+
+    Module.concat(Stripe, module_name)
+  end
+
+  @spec module_to_string(module) :: String.t()
+  def module_to_string(module) do
+    module |> Atom.to_string() |> String.trim_leading("Elixir.")
+  end
+
+  def multipart_key(:file), do: :file
+  def multipart_key(key) when is_atom(key), do: Atom.to_string(key)
+  def multipart_key(key), do: key
+
+  def normalize_id(%{id: id}) when id !== nil, do: id
+  def normalize_id(id) when is_binary(id), do: id
+
+  defmacro log_deprecation(msg \\ "") do
+    if Mix.env() in [:test, :dev] do
+      {fun, arity} = __CALLER__.function
+      mod = __CALLER__.module
+
+      quote bind_quoted: [mod: mod, fun: fun, arity: arity, msg: msg] do
+        require Logger
+        Logger.warn("[DEPRECATION] The function #{mod}.#{fun}/#{arity} is deprecated. #{msg}")
+      end
     end
-    datetime_from_timestamp ts
   end
-
-  def datetime_from_timestamp(ts) when is_number ts do
-    {{year, month, day}, {hour, minutes, seconds}} = :calendar.gregorian_seconds_to_datetime ts
-    {{year + 1970, month, day}, {hour, minutes, seconds}}
-  end
-
-  def datetime_from_timestamp(nil) do
-    datetime_from_timestamp 0
-  end
-
-  def string_map_to_atoms([string_key_map]) do
-    string_map_to_atoms string_key_map
-  end
-
-  def string_map_to_atoms(string_key_map) do
-    for {key, val} <- string_key_map, into: %{}, do: {String.to_atom(key), val}
-  end
-
-  def handle_stripe_response(res) do
-    cond do
-      res["error"] -> {:error, res["error"]["message"]}
-      res["data"] -> {:ok, Enum.map(res["data"], &Stripe.Util.string_map_to_atoms &1)}
-      true -> {:ok, Stripe.Util.string_map_to_atoms res}
-    end
-  end
-
-  # returns the full response in {:ok, response}
-  # this is useful to access top-level properties
-  def handle_stripe_full_response(res) do
-    cond do
-      res["error"] -> {:error, res["error"]["message"]}
-      true -> {:ok, Stripe.Util.string_map_to_atoms res}
-    end
-  end
-
-  def list_raw( endpoint, limit \\ 10, starting_after \\ "") do
-    list_raw endpoint, Stripe.config_or_env_key, limit, starting_after
-  end
-
-  def list_raw( endpoint, key, limit, starting_after)  do
-    q = "#{endpoint}?limit=#{limit}"
-
-    if  String.length(starting_after) > 0 do
-        q = q <> "&starting_after=#{starting_after}"
-    end
-
-    Stripe.make_request_with_key(:get, q, key )
-    |> Stripe.Util.handle_stripe_full_response
-  end
-
-  def list( endpoint, key, starting_after, limit) do
-    list_raw endpoint, key, limit, starting_after
-  end
-
-  def list( endpoint, starting_after \\ "", limit \\ 10) do
-    list endpoint, Stripe.config_or_env_key, starting_after, limit
-  end
-
-  # most stripe listing endpoints allow the total count to be included without any results
-  def count(endpoint) do
-    count endpoint, Stripe.config_or_env_key
-  end
-
-  def count(endpoint, key) do
-    case Stripe.make_request_with_key(:get, "#{endpoint}?include[]=total_count&limit=0", key)
-    |> Stripe.Util.handle_stripe_full_response do
-      {:ok, res} ->
-        {:ok, res[:total_count]}
-      {:error, err} -> raise err
-    end
-end
 end

@@ -1,50 +1,39 @@
-ExUnit.start
-Stripe.start
-ExUnit.configure [exclude: [disabled: true], seed: 0 ]
+ExUnit.start()
+# Stripe.start
+Application.ensure_all_started(:erlexec)
+Application.ensure_all_started(:exexec)
+Application.ensure_all_started(:mox)
+ExUnit.configure(exclude: [disabled: true], seed: 0)
+Logger.configure(level: :info)
+
+{:ok, pid} = Stripe.StripeMock.start_link(port: 12123, global: true)
+
+Application.put_env(:stripity_stripe, :api_base_url, "http://localhost:12123/v1/")
+Application.put_env(:stripity_stripe, :api_upload_url, "http://localhost:12123/v1/")
+Application.put_env(:stripity_stripe, :api_key, "sk_test_123")
+Application.put_env(:stripity_stripe, :log_level, :debug)
+
+Mox.defmock(Stripe.Connect.OAuthMock, for: Stripe.Connect.OAuth)
+Mox.defmock(Stripe.APIMock, for: Stripe.API)
 
 defmodule Helper do
-  def create_test_plans do
-    Stripe.Plans.create [id: "test-std", name: "Test Plan Standard", amount: 100, interval: "month"]
-    Stripe.Plans.create [id: "test-dlx", name: "Test Plan Deluxe", amount: 1000, interval: "month"]
-  end
-  def create_test_plan id do
-    Stripe.Plans.create [id: id, name: "Test Plan #{id}", amount: 100, interval: "month"]
-  end
-  def delete_test_plan id do
-    Stripe.Plans.delete id
+  @fixture_path "./test/fixtures/"
+
+  def load_fixture(filename) do
+    File.read!(@fixture_path <> filename) |> Stripe.API.json_library().decode!()
   end
 
-  def delete_test_plans do
-    Stripe.Plans.delete "test-std"
-    Stripe.Plans.delete "test-dlx"
-  end
+  def wait_until_stripe_mock_launch() do
+    case Stripe.Charge.list() do
+      {:error, %Stripe.Error{code: :network_error}} ->
+        # It might be connection refused.
+        Process.sleep(250)
+        wait_until_stripe_mock_launch()
 
-  def create_test_customer( email ) do
-    new_customer = [
-      email: "#{email}",
-      description: "Test Account",
-      card: [
-        number: "4111111111111111",
-        exp_month: 01,
-        exp_year: 2018,
-        cvc: 123,
-        name: "Joe Test User"
-      ]
-    ]
-    {:ok, res} = Stripe.Customers.create new_customer
-    res
-  end
-
-  def create_test_account(email) do
-    new_account = [
-      email: email,
-      managed: true,
-      legal_entity: [
-        type: "individual"
-      ]
-    ]
-    {:ok, res} = Stripe.Accounts.create new_account
-    res
+      _ ->
+        true
+    end
   end
 end
 
+Helper.wait_until_stripe_mock_launch()

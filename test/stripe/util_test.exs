@@ -1,55 +1,47 @@
 defmodule Stripe.UtilTest do
   use ExUnit.Case
 
-  setup_all do
-    Stripe.Plans.delete_all
-    Helper.create_test_plans
+  import Stripe.Util
 
-    on_exit fn ->
-      Stripe.Plans.delete_all
-    end
-    :ok
-  end
-
-  test "Count" do
-    case Stripe.Util.count "plans" do
-      {:ok, cnt} -> assert cnt == 2 
-      {:error, err} -> flunk err
-    end
-  end
-  test "Count w/key" do
-    case Stripe.Util.count "plans", Stripe.config_or_env_key do
-      {:ok, cnt} -> assert cnt == 2 
-      {:error, err} -> flunk err
-    end
-  end
-  test "list_raw" do
-    case Stripe.Util.list_raw "plans" do
-      {:ok, plans} -> assert plans 
-      {:error, err} -> flunk err
-    end
-  end
-  test "list_raw w/key" do
-    case Stripe.Util.list_raw "plans", Stripe.config_or_env_key, 10, "" do
-      {:ok, plans} -> assert plans
-      {:error, err} -> flunk err
-    end
-  end
-
-  @tag disabled: false
-  test "list works" do
-    case Stripe.Util.list "plans" do
-      {:ok, resp} ->
-        assert Dict.size(resp[:data]) == 2
-      {:error, err} -> flunk err
+  describe "object_name_to_module/1" do
+    test "converts all object names to their proper modules" do
+      assert object_name_to_module("account") == Stripe.Account
+      assert object_name_to_module("application_fee") == Stripe.ApplicationFee
+      assert object_name_to_module("fee_refund") == Stripe.FeeRefund
+      assert object_name_to_module("bank_account") == Stripe.BankAccount
+      assert object_name_to_module("card") == Stripe.Card
+      assert object_name_to_module("coupon") == Stripe.Coupon
+      assert object_name_to_module("customer") == Stripe.Customer
+      assert object_name_to_module("dispute") == Stripe.Dispute
+      assert object_name_to_module("event") == Stripe.Event
+      assert object_name_to_module("external_account") == Stripe.ExternalAccount
+      assert object_name_to_module("file") == Stripe.FileUpload
+      assert object_name_to_module("invoice") == Stripe.Invoice
+      assert object_name_to_module("invoiceitem") == Stripe.Invoiceitem
+      assert object_name_to_module("line_item") == Stripe.LineItem
+      assert object_name_to_module("list") == Stripe.List
+      assert object_name_to_module("order") == Stripe.Order
+      assert object_name_to_module("order_return") == Stripe.OrderReturn
+      assert object_name_to_module("payment_intent") == Stripe.PaymentIntent
+      assert object_name_to_module("plan") == Stripe.Plan
+      assert object_name_to_module("product") == Stripe.Product
+      assert object_name_to_module("refund") == Stripe.Refund
+      assert object_name_to_module("setup_intent") == Stripe.SetupIntent
+      assert object_name_to_module("subscription") == Stripe.Subscription
+      assert object_name_to_module("subscription_item") == Stripe.SubscriptionItem
+      assert object_name_to_module("sku") == Stripe.Sku
+      assert object_name_to_module("topup") == Stripe.Topup
+      assert object_name_to_module("transfer") == Stripe.Transfer
+      assert object_name_to_module("transfer_reversal") == Stripe.TransferReversal
+      assert object_name_to_module("token") == Stripe.Token
     end
   end
 
-  @tag disabled: false
-  test "list w/key works" do
-    case Stripe.Util.list "plans", Stripe.config_or_env_key,  "", 2  do
-      {:ok, resp} -> assert Dict.size( resp[:data]) == 2 
-      {:error, err} -> flunk err
+  describe "multipart_key/1" do
+    test "handle all multipart keys" do
+      assert multipart_key(:file) == :file
+      assert multipart_key(:foo) == "foo"
+      assert multipart_key("foo") == "foo"
     end
-   end
+  end
 end

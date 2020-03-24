@@ -1,120 +1,105 @@
 defmodule Stripe do
   @moduledoc """
   A HTTP client for Stripe.
-  """
 
-  # Let's build on top of HTTPoison
+  ## Configuration
+
+  ### API Key
+
+  You need to set your API key in your application configuration. Typically
+  this is done in `config/config.exs` or a similar file. For example:
+
+      config :stripity_stripe, api_key: "sk_test_abc123456789qwerty"
+
+  You can also utilize `System.get_env/1` to retrieve the API key from
+  an environment variable, but remember that this can cause issues if
+  you use a release tool like exrm or Distillery.
+
+      config :stripity_stripe, api_key: System.get_env("STRIPE_API_KEY")
+
+  ### Shared Options
+
+  Almost all of the requests that can be sent accept the following options:
+
+    * `:api_key` - The Stripe API key to use for the request. See
+      [https://stripe.com/docs/api/authentication](https://stripe.com/docs/api/authentication)
+    * `:api_version` - The version of the api that is being used, defaults to the
+      version the library is written for. See [https://stripe.com/docs/api/versioning](https://stripe.com/docs/api/versioning)
+    * `:connect_account` - The ID of a Stripe Connect account for which the
+      request should be made, passed through as the "Stripe-Account" header. The
+      preferred authentication method for Stripe Connect. See
+      [https://stripe.com/docs/connect/authentication#stripe-account-header](https://stripe.com/docs/connect/authentication#stripe-account-header)
+    * `:expand` - Takes a list of fields that should be expanded in the response
+      from Stripe. See [https://stripe.com/docs/api/expanding_objects](https://stripe.com/docs/api/expanding_objects)
+    * `:idempotency_key` - A string that is passed through as the "Idempotency-Key" header on all POST requests. This is used by Stripe's idempotency layer to manage
+      duplicate requests to the stripe API. See [https://stripe.com/docs/api/idempotent_requests](https://stripe.com/docs/api/idempotent_requests)
+
+  ### HTTP Connection Pool
+
+  Stripity Stripe is set up to use an HTTP connection pool by default. This
+  means that it will reuse already opened HTTP connections in order to
+  minimize the overhead of establishing connections. The pool is directly
+  supervised by Stripity Stripe. Two configuration options are
+  available to tune how this pool works: `:timeout` and `:max_connections`.
+
+  `:timeout` is the amount of time that a connection will be allowed
+  to remain open but idle (no data passing over it) before it is closed
+  and cleaned up. This defaults to 5 seconds.
+
+  `:max_connections` is the maximum number of connections that can be
+  open at any time. This defaults to 10.
+
+  Both these settings are located under the `:pool_options` key in
+  your application configuration:
+
+      config :stripity_stripe, :pool_options,
+        timeout: 5_000,
+        max_connections: 10
+
+  If you prefer, you can also turn pooling off completely using
+  the `:use_connection_pool` setting:
+
+      config :stripity_stripe, use_connection_pool: false
+
+  """
   use Application
-  use HTTPoison.Base
 
-  def start(_type, _args) do
-    start #start HTTPoison.Base.start inherited from use statement 
-    Stripe.Supervisor.start_link
-  end
-
-  @doc """
-  Creates the URL for our endpoint.
-  Args:
-    * endpoint - part of the API we're hitting
-  Returns string
-  """
-  def process_url(endpoint) do
-    "https://api.stripe.com/v1/" <> endpoint
-  end
-
-  @doc """
-  Set our request headers for every request.
-  """
-  def req_headers(key) do
-    HashDict.new
-      |> Dict.put("Authorization", "Bearer #{key}")
-      |> Dict.put("User-Agent",    "Stripe/v1 stripe-elixir/0.1.0")
-      |> Dict.put("Content-Type",  "application/x-www-form-urlencoded")
-  end
+  @type id :: String.t()
+  @type date_query :: %{
+          optional(:gt) => timestamp,
+          optional(:gte) => timestamp,
+          optional(:lt) => timestamp,
+          optional(:lte) => timestamp
+        }
+  @type integer_query :: %{
+          optional(:gt) => integer,
+          optional(:gte) => integer,
+          optional(:lt) => integer,
+          optional(:lte) => integer
+        }
+  @type options :: Keyword.t()
+  @type timestamp :: pos_integer
 
   @doc """
-  Converts the binary keys in our response to atoms.
-  Args:
-    * body - string binary response
-  Returns Record or ArgumentError
+  Callback for the application
+
+  Start the supervision tree including the supervised
+  HTTP connection pool (if it's being used) when
+  the VM loads the application pool.
+
+  Note that we are taking advantage of the BEAM application
+  standard in order to start the pool when the application is
+  started. While we do start a supervisor, the supervisor is only
+  to comply with the expectations of the BEAM application standard.
+  It is not given any children to supervise.
   """
-  def process_response_body(body) do
-    Poison.decode! body
-  end
+  @spec start(Application.start_type(), any) :: {:error, any} | {:ok, pid} | {:ok, pid, any}
+  def start(_start_type, _args) do
+    import Supervisor.Spec, warn: false
 
-  @doc """
-  Boilerplate code to make requests with a given key.
-  Args:
-    * method - request method
-    * endpoint - string requested API endpoint
-    * key - stripe key passed to the api
-    * body - request body
-    * headers - request headers
-    * options - request options
-  Returns dict
-  """
-  def make_request_with_key( method, endpoint, key, body \\ [], headers \\ [], options \\ []) do
-    rb = Stripe.URI.encode_query(body)
-    rh = req_headers( key )
-        |> Dict.merge(headers)
-        |> Dict.to_list
+    children = Stripe.API.supervisor_children()
 
-    {:ok, response} = request(method, endpoint, rb, rh, options)
-    response.body
-  end
-
-  @doc """
-  Boilerplate code to make requests with the key read from config or env.see config_or_env_key/0
-  Args:
-  * method - request method
-  * endpoint - string requested API endpoint
-  * key - stripe key passed to the api
-  * body - request body
-  * headers - request headers
-  * options - request options
-  Returns dict
-  """
-  def make_request(method, endpoint, body \\ [], headers \\ [], options \\ []) do
-    make_request_with_key( method, endpoint, config_or_env_key, body, headers, options )
-  end
-
-
-  def make_oauth_token_callback_request(body) do
-    rb = Stripe.URI.encode_query(body)
-    rh = req_headers( Stripe.config_or_env_key )
-        |> Dict.to_list
-        options = []
-    HTTPoison.request(:post, "#{Stripe.Connect.base_url}oauth/token", rb, rh, options)
-  end
-
-  def make_oauth_deauthorize_request(stripe_user_id) do
-    rb = Stripe.URI.encode_query([
-      stripe_user_id: stripe_user_id,
-      client_id: Stripe.config_or_env_platform_client_id])
-    rh = req_headers( Stripe.config_or_env_key)
-    |> Dict.to_list
-
-    options = []
-    HTTPoison.request(:post, "#{Stripe.Connect.base_url}oauth/deauthorize", rb, rh, options)
-  end
-
-
-
-  @doc """
-  Grabs STRIPE_SECRET_KEY from system ENV
-  Returns binary
-  """
-  def config_or_env_key do
-    Application.get_env(:stripity_stripe, :secret_key) ||
-      System.get_env "STRIPE_SECRET_KEY"
-  end
-
-  @doc """
-  Grabs STRIPE_PLATFORM_CLIENT_ID from system ENV
-  Returns binary
-  """
-  def config_or_env_platform_client_id do
-    Application.get_env(:stripity_stripe, :platform_client_id) ||
-      System.get_env "STRIPE_PLATFORM_CLIENT_ID"
+    opts = [strategy: :one_for_one, name: Stripe.Supervisor]
+    Supervisor.start_link(children, opts)
   end
 end
